@@ -16,9 +16,19 @@ Edit `synthesizer/data_synth.py` to specify the configuration.
 Generate a dataset of pixelated images by running `launch.py` and choosing the "Synthesize images" option.
 
 ### Training a model
-Edit `config.json` to specify the training configuration.
+Edit `config.json` to specify the configuration.
 Run `launch.py` and choose the "Train model" option.
+
+### Benchmarking a model
+Edit `config.json` to specify the configuration.
+Run `launch.py` and choose the "Benchmark model" option.
+
+### Inference
+Edit `config.json` and specify `model_name`.
+Run `launch.py` and choose the "Run inference" option.
 
 ### Licensing
 
 This project is licensed under the [MIT license](LICENSE).
+
+[![MIT License](https://img.shields.io/badge/license-MIT_License-blue)](https://opensource.org/licenses/MIT)
