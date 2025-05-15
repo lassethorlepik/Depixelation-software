@@ -11,7 +11,7 @@ The model is built using Pytorch, leveraging convolutional neural networks (CNNs
 Launch setup.py to install requirements in venv.
 Start launcher.py after setup is done.
 
-### Dataset Generation
+### Dataset generation
 Edit `synthesizer/data_synth.py` to specify the configuration.
 Generate a dataset of pixelated images by running `launch.py` and choosing the "Synthesize images" option.
 
