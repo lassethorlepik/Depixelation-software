@@ -14,7 +14,7 @@ from datetime import datetime
 # Internal tools and modules
 from util import print, decode_label, check_gpu_compute
 from dataset_instance import OCRDataset
-from model import OCRModel, decode_batch_predictions
+from model import OCRModel
 
 # Longest string allowed to be output, used to avoid extremely long sequences and text overlapping
 # Excess characters will be simply discarded
@@ -122,7 +122,7 @@ def main():
                 images = batch['image'].to(device)
                 labels = batch.get('label', None)
                 preds, loss = model(images)
-                pred_texts = decode_batch_predictions(preds, MAX_LENGTH, dataset.num_to_char)
+                pred_texts = model.decode_batch_predictions(preds, MAX_LENGTH, dataset.num_to_char)
                 orig_texts = []
                 for label in labels:
                     orig_texts.append(decode_label(dataset.num_to_char, label))

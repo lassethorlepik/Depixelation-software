@@ -49,7 +49,7 @@ Already trained models can be downloaded here:
 Each model is in a zip file, which needs to be extracted in the `models` folder.
 Model metadata, benchmark results and training logs are included.
 
-### Licensing
+## Licensing
 
 This project is licensed under the [MIT license](LICENSE).
 

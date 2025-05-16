@@ -15,7 +15,7 @@ import seaborn as sns
 # Internal tools
 from util import check_gpu_compute, print, similarity, decode_label
 from dataset_instance import OCRDataset
-from model import OCRModel, decode_batch_predictions
+from model import OCRModel
 
 
 def main():
@@ -104,7 +104,7 @@ def main():
                 labels = batch['label'].to(device)
                 label_len = batch["label_length"].to(device)
                 preds, loss = model(images, labels, label_len)
-                pred_texts = decode_batch_predictions(preds, dataset.max_length, dataset.num_to_char)
+                pred_texts = model.decode_batch_predictions(preds, dataset.max_length, dataset.num_to_char)
                 orig_texts = []
                 for label in labels:
                     orig_texts.append(decode_label(dataset.num_to_char, label))

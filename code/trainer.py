@@ -6,7 +6,7 @@ import torch
 from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from dataset_instance import OCRDataset
-from model import OCRModel, train_epoch
+from model import OCRModel
 from util import print, check_gpu_compute
 
 
@@ -87,7 +87,7 @@ def main():
     for epoch in range(initial_epoch, params['max_epochs']):
         print(f"Epoch {epoch + 1}/{params['max_epochs']} starting...")
 
-        avg_train_loss = train_epoch(dataset.model, train_loader, optimizer, device)
+        avg_train_loss = dataset.model.train_epoch(train_loader, optimizer, device)
         avg_val_loss, percentages = dataset.validate(validation_loader, device)
 
         epoch_duration = time.perf_counter() - start_time

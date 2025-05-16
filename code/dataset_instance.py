@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from util import pad_custom_color, decode_label, remove_prefix, print, similarity, generate_random_string, crop_white
-from model import decode_batch_predictions
 
 
 class OCRDataset:
@@ -172,7 +171,7 @@ class OCRDataset:
                 log_probs, loss = self.model(images, labels, label_len)
                 total_loss += loss.mean().item()
 
-                decoded_texts = decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
+                decoded_texts = self.model.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
                 for i, text in enumerate(decoded_texts):
                     decoded_label = decode_label(self.num_to_char, labels[i])
                     match_percentage = similarity(text, decoded_label)
@@ -236,7 +235,7 @@ class OCRDataset:
             log_probs, _ = model(images, labels, label_len)
 
         orig_texts = [decode_label(self.num_to_char, labels[i]) for i in range(len(labels))]
-        decoded_texts = decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
+        decoded_texts = model.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
 
         n_cols = 4
         n_rows = (num_samples + n_cols - 1) // n_cols

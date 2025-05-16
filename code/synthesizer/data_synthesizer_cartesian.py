@@ -3,11 +3,11 @@ from .data_synthesizer import DataSynthesizer
 
 class DataSynthesizerCartesian(DataSynthesizer):
     def __init__(self, params):
-        super().__init__(params)
         self.charset = params["CHARSET"]
         self.n = params["SEQUENCE_LENGTH"]
         self.k = len(self.charset)
         self.total_combinations = self.k ** self.n
+        super().__init__(params)
 
     def get_text(self, index):
         """Fetch combination of characters based on index."""

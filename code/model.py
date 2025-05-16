@@ -16,18 +16,6 @@ def ctc_decode(y_pred: torch.Tensor, blank: int = 0):
     return decoded, None
 
 
-def decode_batch_predictions(log_probs: torch.Tensor, max_length: int, num_to_char: dict[int, str]):
-    """Convert network log‑probs to a list of decoded strings."""
-    decoded, _ = ctc_decode(log_probs)  # list of length B
-    texts: list[str] = []
-    for seq in decoded:
-        if max_length is not None:
-            seq = seq[:max_length]
-        chars = [num_to_char.get(int(idx), "") for idx in seq]
-        texts.append("".join(chars))
-    return texts
-
-
 class OCRModel(nn.Module):
     def __init__(self, img_width: int, img_height: int, num_chars: int):
         super().__init__()
@@ -103,34 +91,44 @@ class OCRModel(nn.Module):
         )
         return log_probs, loss
 
+    def train_epoch(self, dataloader, optimizer, device: torch.device):
+        """One training epoch. The dataloader must yield dicts with keys:
+            image Tensor[B, 1, H, W]
+            label Tensor[B, max_label_len] (padded)
+            label_len Tensor[B] (non‑pad counts)
 
-def train_epoch(model: OCRModel, dataloader, optimizer, device: torch.device):
-    """One training epoch. The dataloader must yield dicts with keys:
-        image Tensor[B, 1, H, W]
-        label Tensor[B, max_label_len] (padded)
-        label_len Tensor[B] (non‑pad counts)
+        Returns Average epoch loss (mean of per‑image losses).
+        """
+        self.train()
+        total_images = len(dataloader.dataset)
+        bar = tqdm(total=total_images, desc="Train", leave=False)
 
-    Returns Average epoch loss (mean of per‑image losses).
-    """
-    model.train()
-    total_images = len(dataloader.dataset)
-    bar = tqdm(total=total_images, desc="Train", leave=False)
+        running_loss = 0.0
+        for batch in dataloader:
+            images = batch["image"].to(device)
+            labels = batch["label"].to(device)
+            label_len = batch["label_length"].to(device)
 
-    running_loss = 0.0
-    for batch in dataloader:
-        images = batch["image"].to(device)
-        labels = batch["label"].to(device)
-        label_len = batch["label_length"].to(device)
+            optimizer.zero_grad()
+            _, loss = self(images, labels, label_len)
+            loss_mean = loss.mean()
+            loss_mean.backward()
+            optimizer.step()
 
-        optimizer.zero_grad()
-        _, loss = model(images, labels, label_len)
-        loss_mean = loss.mean()
-        loss_mean.backward()
-        optimizer.step()
+            running_loss += float(loss_mean.detach())
+            bar.update(images.size(0))
+            bar.set_postfix({"img_loss": f"{loss_mean.item():.4f}"})
 
-        running_loss += float(loss_mean.detach())
-        bar.update(images.size(0))
-        bar.set_postfix({"img_loss": f"{loss_mean.item():.4f}"})
+        bar.close()
+        return running_loss / len(dataloader)
 
-    bar.close()
-    return running_loss / len(dataloader)
+    def decode_batch_predictions(self, log_probs: torch.Tensor, max_length: int, num_to_char: dict[int, str]):
+        """Convert network log‑probs to a list of decoded strings."""
+        decoded, _ = ctc_decode(log_probs)  # list of length B
+        texts: list[str] = []
+        for seq in decoded:
+            if max_length is not None:
+                seq = seq[:max_length]
+            chars = [num_to_char.get(int(idx), "") for idx in seq]
+            texts.append("".join(chars))
+        return texts

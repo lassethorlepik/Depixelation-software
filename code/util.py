@@ -49,8 +49,7 @@ def check_gpu_compute():
 
 def remove_prefix(text):
     """Remove the prefix from training input images."""
-    tail = text.partition('_')[2]
-    return tail or text
+    return text.split("_")[1]
 
 
 def generate_random_string(length=4, letters=string.ascii_letters + string.digits):
