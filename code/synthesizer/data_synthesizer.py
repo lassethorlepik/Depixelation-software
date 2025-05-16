@@ -78,6 +78,10 @@ class DataSynthesizer:
         self.pixelate_image_mono(bitmap, block_size, shift_x=shiftx, shift_y=shifty)
         bitmap = self.crop_and_pad_image(bitmap, block_size, background_color)
 
+        if all(p == background_color for p in bitmap.getdata()):
+            print(f"Skipping index {index!r}: no non-white pixels generated.")
+            return
+
         file_name = f"{output_folder}/{index}_{text}.png"
         bitmap.save(file_name)
 

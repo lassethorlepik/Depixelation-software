@@ -62,18 +62,33 @@ class OCRDataset:
     def _split_dataset(self):
         total_size = len(self.all_images)
         train_size = int(total_size * self.train_data_amount)
+        # First split off training data
         if self.dataset_limit is not None:
             train_limit = self.dataset_limit
-            validation_limit = int(self.dataset_limit * self.train_data_amount)
             self.train_images = self.all_images[:train_size][:train_limit]
             self.train_labels = self.all_labels[:train_size][:train_limit]
-            self.valid_images = self.all_images[train_size:][:validation_limit]
-            self.valid_labels = self.all_labels[train_size:][:validation_limit]
+            remaining_images = self.all_images[train_size:]
+            remaining_labels = self.all_labels[train_size:]
         else:
             self.train_images = self.all_images[:train_size]
             self.train_labels = self.all_labels[:train_size]
-            self.valid_images = self.all_images[train_size:]
-            self.valid_labels = self.all_labels[train_size:]
+            remaining_images = self.all_images[train_size:]
+            remaining_labels = self.all_labels[train_size:]
+        # Next split remaining into validation and test sets
+        test_split = 0.5  # proportion of remaining data to reserve for testing
+        split_idx = int(len(remaining_images) * (1 - test_split))
+        self.valid_images = remaining_images[:split_idx]
+        self.valid_labels = remaining_labels[:split_idx]
+        self.test_images = remaining_images[split_idx:]
+        self.test_labels = remaining_labels[split_idx:]
+        # If a dataset_limit is set, remove excess
+        if self.dataset_limit is not None:
+            valid_limit = int(self.dataset_limit * (1 - self.train_data_amount) * (1 - test_split))
+            test_limit = int(self.dataset_limit * (1 - self.train_data_amount) * test_split)
+            self.valid_images = self.valid_images[:valid_limit]
+            self.valid_labels = self.valid_labels[:valid_limit]
+            self.test_images = self.test_images[:test_limit]
+            self.test_labels = self.test_labels[:test_limit]
 
     class _SplitDataset(Dataset):
         def __init__(self, images, labels, img_width, img_height, transform):
@@ -158,10 +173,25 @@ class OCRDataset:
             pin_memory=pin_memory,
         )
 
+    def get_test_dataloader(self, batch_size=16, shuffle=False, num_workers=4, pin_memory=True):
+        test_dataset = OCRDataset._SplitDataset(
+            self.test_images, self.test_labels, self.img_width, self.img_height, self.transform
+        )
+        return DataLoader(
+            test_dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            collate_fn=OCRDataset.collate_fn,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+        )
+
     def validate(self, dataloader, device):
         self.model.eval()
         total_loss = 0.0
         percentages = []
+        weighted_match_sum = 0.0
+        weighted_total_chars = 0
         with torch.no_grad():
             for batch in dataloader:
                 images = batch['image'].to(device)
@@ -176,8 +206,14 @@ class OCRDataset:
                     decoded_label = decode_label(self.num_to_char, labels[i])
                     match_percentage = similarity(text, decoded_label)
                     percentages.append(match_percentage)
+                    seq_len = len(decoded_label)
+                    weighted_match_sum += match_percentage / 100 * seq_len
+                    weighted_total_chars += seq_len
 
-        avg_percentage = sum(percentages) / len(percentages)
+        if weighted_total_chars > 0:
+            avg_percentage = weighted_match_sum / weighted_total_chars
+        else:
+            avg_percentage = 0
         self.validation_percentages.append(avg_percentage)
         avg_val_loss = total_loss / len(dataloader)
         return avg_val_loss, percentages

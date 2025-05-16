@@ -43,7 +43,7 @@ def main():
         train_data_amount=train_data_amount,
     )
 
-    validation_loader = dataset.get_validation_dataloader(
+    test_loader = dataset.get_test_dataloader(
         batch_size=batch_size, shuffle=False
     )
 
@@ -66,9 +66,10 @@ def main():
         print("NO MODEL FOUND!")
 
     # Initialize benchmarking metrics.
-    total_correct = 0
-    total_images = 0
-    total_match_percentage = 0.0
+    total_sequences = 0
+    total_correct_seqs = 0
+    weighted_match_sum = 0
+    weighted_total_chars = 0
     match_percentages = []
 
     # For confusion matrix collection.
@@ -92,14 +93,14 @@ def main():
         TimeRemainingColumn()
     )
 
-    validation_images = len(validation_loader.dataset)
+    validation_images = len(test_loader.dataset)
     benchmark_path = f'../models/{model_name}/benchmark'
     os.makedirs(benchmark_path, exist_ok=True)
 
     with torch.no_grad():
         with progressbar as progress:
             task = progress.add_task(f"Processing 0 / {validation_images}", total=validation_images)
-            for batch_num, batch in enumerate(validation_loader):
+            for batch_num, batch in enumerate(test_loader):
                 images = batch['image'].to(device)
                 labels = batch['label'].to(device)
                 label_len = batch["label_length"].to(device)
@@ -124,8 +125,13 @@ def main():
                         all_pred_chars.append(pred_char)
 
                     match_percentage = similarity(pred_text, orig_text)
+                    seq_len = len(orig_text)
+                    weighted_match_sum += match_percentage / 100 * seq_len
+                    weighted_total_chars += seq_len
+
                     match_percentages.append(match_percentage)
-                    total_match_percentage += match_percentage
+                    total_sequences += 1
+                    total_correct_seqs += (pred_text == orig_text)
 
                     # Process image for display.
                     img = images[i].cpu().numpy()
@@ -144,10 +150,6 @@ def main():
                     ax[i // 4, i % 4].set_title(title, fontsize=8, color=color)
                     ax[i // 4, i % 4].axis("off")
 
-                    if is_correct:
-                        total_correct += 1
-                    total_images += 1
-
                 # Hide any unused subplots.
                 for j in range(n_preds, n_rows * 4):
                     ax[j // 4, j % 4].axis("off")
@@ -157,26 +159,26 @@ def main():
                 plt.close()
 
                 progress.update(task, advance=images.size(0),
-                                description=f"Processing {total_images} / {validation_images}")
+                                description=f"Processing {total_sequences} / {validation_images}")
 
     # Compute overall metrics.
-    accuracy_percentage = (total_correct / total_images) * 100 if total_images > 0 else 0
-    average_match_percentage = (total_match_percentage / total_images) if total_images > 0 else 0
+    sequence_accuracy_percentage = (total_correct_seqs / total_sequences) * 100 if total_sequences > 0 else 0
+    accuracy_percentage = (weighted_match_sum / weighted_total_chars) * 100 if weighted_total_chars > 0 else 0
     sorted_percentages = sorted(match_percentages)
     worst_match_percentage = sorted_percentages[0] if sorted_percentages else 0
     percentile_1st = np.percentile(sorted_percentages, 1) if sorted_percentages else 0
 
     print(f"BENCHMARK COMPLETE\n")
-    print(f"Perfect sequence predictions: {accuracy_percentage:.2f}%")
-    print(f"Predicted characters correctly: {average_match_percentage:.2f}%")
+    print(f"Perfect sequence predictions: {sequence_accuracy_percentage:.2f}%")
+    print(f"Predicted characters correctly: {accuracy_percentage:.2f}%")
     print(f"Worst sequence: {worst_match_percentage:.2f}%")
     print(f"1st percentile sequence: {percentile_1st:.2f}%")
 
     # Save summary to file.
     output_file_path = f'{benchmark_path}/results_summary.txt'
     with open(output_file_path, 'w') as file:
-        file.write(f"Perfect sequence predictions: {accuracy_percentage:.2f}%\n")
-        file.write(f"Predicted characters correctly: {average_match_percentage:.2f}%\n")
+        file.write(f"Perfect sequence predictions: {sequence_accuracy_percentage:.2f}%\n")
+        file.write(f"Predicted characters correctly: {accuracy_percentage:.2f}%\n")
         file.write(f"Worst sequence: {worst_match_percentage:.2f}%\n")
         file.write(f"1st percentile sequence: {percentile_1st:.2f}%\n")
 

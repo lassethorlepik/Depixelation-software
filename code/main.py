@@ -2,63 +2,41 @@ import os
 import subprocess
 import sys
 
+actions = {
+    "1": ("Synthesize images", "synthesizer.data_synth"),
+    "2": ("Train model", "trainer"),
+    "3": ("Benchmark model", "benchmarker"),
+    "4": ("Run inference", "inference"),
+}
 
-def synthesize():
-    print("\n>> Synthesize images\n")
-    subprocess.check_call(
-        [sys.executable, "-m", "synthesizer.data_synth"],
-        cwd=os.path.dirname(__file__)
-    )
-
-
-def train_model():
-    print("\n>> Train model\n")
-    subprocess.check_call(
-        [sys.executable, "-m", "trainer"],
-        cwd=os.path.dirname(__file__)
-    )
+BASE_DIR = os.path.dirname(__file__)
 
 
-def benchmark_model():
-    print("\n>> Benchmark model\n")
-    subprocess.check_call(
-        [sys.executable, "-m", "benchmarker"],
-        cwd=os.path.dirname(__file__)
-    )
+def run_action(module: str, description: str) -> None:
+    """Execute a Python module as a subprocess."""
+    print(f"\n>> {description}\n")
+    subprocess.check_call([
+        sys.executable,
+        "-m",
+        module,
+    ], cwd=BASE_DIR)
 
 
-def run_inference():
-    print("\n>> Run inference\n")
-    subprocess.check_call(
-        [sys.executable, "-m", "inference"],
-        cwd=os.path.dirname(__file__)
-    )
-
-
-def main():
+def main() -> None:
     print("=== Command-Line Interface ===")
-
-    menu = (
-        "\nSelect an option:\n"
-        " [1] Synthesize images\n"
-        " [2] Train model\n"
-        " [3] Benchmark model\n"
-        " [4] Run inference\n"
-        " [0] Exit\n"
-    )
-
+    menu_lines = ["\nSelect an option:"]
+    for key, (desc, _) in actions.items():
+        menu_lines.append(f" [{key}] {desc}")
+    menu_lines.append(" [0] Exit\n")
+    menu_text = "\n".join(menu_lines)
     while True:
-        choice = input(menu + "Enter choice (index): ").strip()
-        if choice == "1":
-            synthesize()
-        elif choice == "2":
-            train_model()
-        elif choice == "3":
-            benchmark_model()
-        elif choice == "4":
-            run_inference()
-        elif choice == "0":
+        choice = input(menu_text + "\nEnter choice (index): ").strip()
+        if choice == "0":
             break
+        action = actions.get(choice)
+        if action:
+            description, module = action
+            run_action(module, description)
         else:
             print("Invalid choice.")
 
