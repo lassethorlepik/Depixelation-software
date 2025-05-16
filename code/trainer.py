@@ -116,7 +116,7 @@ def main():
             best_val_loss = avg_val_loss
             best_model_state = dataset.model.state_dict()
             best_optimizer_state = optimizer.state_dict()
-            print(f"New best model found at epoch {epoch + 1} with validation loss: {best_val_loss:.4f}")
+            print(f"New best weights found at epoch {epoch + 1} with validation loss: {best_val_loss:.4f}")
 
         checkpoint_data = {
             'epoch': epoch,

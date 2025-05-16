@@ -32,4 +32,4 @@ SOFTWARE.
 
 ## English words
 
-This project includes wordlist `english-words-466k.txt`, which is released under the [Unlicence](https://unlicense.org)
+This project includes wordlist `english-words-466k.txt`, which was released under the [Unlicence](https://unlicense.org)

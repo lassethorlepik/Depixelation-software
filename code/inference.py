@@ -9,12 +9,16 @@ import torch
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn, TaskProgressColumn
 from rich.console import Console
 from rich.theme import Theme
+from datetime import datetime
 
 # Internal tools and modules
 from util import print, decode_label, check_gpu_compute
 from dataset_instance import OCRDataset
 from model import OCRModel, decode_batch_predictions
 
+# Longest string allowed to be output, used to avoid extremely long sequences and text overlapping
+# Excess characters will be simply discarded
+MAX_LENGTH = 25
 
 def display_inference_results(output_dir, cols=5):
     """Display saved inference images in a grid using matplotlib."""
@@ -44,7 +48,7 @@ def main():
     image_extensions = ['.png', '.jpg', '.jpeg', '.bmp']
     image_paths = [p for p in folder_path.iterdir() if p.suffix.lower() in image_extensions]
     if not image_paths:
-        print("No images found in the selected folder.")
+        print("No images found.")
         return
 
     with open("config.json", "r", encoding="utf-8") as f:
@@ -118,7 +122,7 @@ def main():
                 images = batch['image'].to(device)
                 labels = batch.get('label', None)
                 preds, loss = model(images)
-                pred_texts = decode_batch_predictions(preds, dataset.max_length, dataset.num_to_char)
+                pred_texts = decode_batch_predictions(preds, MAX_LENGTH, dataset.num_to_char)
                 orig_texts = []
                 for label in labels:
                     orig_texts.append(decode_label(dataset.num_to_char, label))
@@ -139,7 +143,8 @@ def main():
                     ax.set_title(pred_text, fontsize=10, color="black", pad=5)
                     ax.axis("off")
 
-                    save_filename = f"{orig_texts[i]}.png"
+                    current_time = datetime.now().strftime("%H.%M.%S")
+                    save_filename = f"IMG {i} {current_time}.png"
                     save_path = output_dir / save_filename
                     plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
                     plt.close(fig)

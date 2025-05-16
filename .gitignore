@@ -9,7 +9,8 @@ models/
 *.zip
 *.json
 *.pth
-
 *.png
-# But do not ignore PNG files in:
+
+# But do not ignore:
 !/sources/*
+!/code/config.json
