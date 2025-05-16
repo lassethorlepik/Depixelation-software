@@ -40,7 +40,12 @@ See example of a correctly prepared image in `sources/example_input.png` ![examp
 Can you crack the example image? Hint: Capital letters, 24pt Arial, block size 8 pixels.
 
 ### Downloading weights
-Already trained models can be downloaded from the releases tab.
+Already trained models can be downloaded here:
+
+[Numbers Arial 8px](http://pov.ee/link/weights/numbers.zip)
+
+[Capital letters Arial 8px](http://pov.ee/link/weights/capital_letters.zip)
+
 Each model is in a zip file, which needs to be extracted in the `models` folder.
 Model metadata, benchmark results and training logs are included.
 
