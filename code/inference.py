@@ -79,7 +79,7 @@ def main():
         charset=charset
     )
 
-    validation_loader = dataset.get_validation_dataloader(
+    test_loader = dataset.get_test_dataloader(
         batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True
     )
 
@@ -113,12 +113,12 @@ def main():
         TimeRemainingColumn()
     )
 
-    total_images = len(validation_loader.dataset)
+    total_images = len(test_loader.dataset)
 
     with torch.no_grad():
         with progressbar as progress:
             task = progress.add_task(f"Processing 0 / {total_images}", total=total_images)
-            for batch_num, batch in enumerate(validation_loader):
+            for batch_num, batch in enumerate(test_loader):
                 images = batch['image'].to(device)
                 labels = batch.get('label', None)
                 preds, loss = model(images)

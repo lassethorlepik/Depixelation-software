@@ -92,7 +92,7 @@ class DataSynthesizer:
         elif self.ANTIALIAS == False:
             return "1"
         else:
-            return "L" if random.choice([True, False]) else "1"
+            return random.choice(["L", "1"])
 
     def get_text(self, index):
         "Fetch text for a specific index in the dataset"

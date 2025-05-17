@@ -32,9 +32,9 @@ class OCRModel(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
         lstm_input_size = img_height * 256
-        self.lstm0 = nn.LSTM(lstm_input_size, 512, num_layers=2, bidirectional=True, batch_first=True, dropout=0.2)
-        self.lstm1 = nn.LSTM(2 * 512, 256, num_layers=2, bidirectional=True, batch_first=True, dropout=0.2)
-        self.lstm2 = nn.LSTM(2 * 256, 128, num_layers=2, bidirectional=True, batch_first=True, dropout=0.2)
+        self.lstm0 = nn.LSTM(lstm_input_size, 512, num_layers=2, bidirectional=True, batch_first=True, dropout=0.15)
+        self.lstm1 = nn.LSTM(2 * 512, 256, num_layers=2, bidirectional=True, batch_first=True, dropout=0.15)
+        self.lstm2 = nn.LSTM(2 * 256, 128, num_layers=2, bidirectional=True, batch_first=True, dropout=0.15)
 
         self.fc = nn.Linear(2 * 128, num_chars)  # final classifier, includes blank
 

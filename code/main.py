@@ -7,6 +7,7 @@ actions = {
     "2": ("Train model", "trainer"),
     "3": ("Benchmark model", "benchmarker"),
     "4": ("Run inference", "inference"),
+    "5": ("Inspect model", "model_inspector"),
 }
 
 BASE_DIR = os.path.dirname(__file__)

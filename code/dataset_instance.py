@@ -33,8 +33,11 @@ class OCRDataset:
         rng = Random(42)
         self.all_images = [img for d in self.data_dirs for img in d.glob("*.png")]
         rng.shuffle(self.all_images)
-        # Extract labels from image filenames (using remove_prefix)
-        self.all_labels = [remove_prefix(img.stem) for img in self.all_images]
+        # Extract labels from image filenames
+        if self.train_data_amount == 0:
+            self.all_labels = [img.stem for img in self.all_images]
+        else:
+            self.all_labels = [remove_prefix(img.stem) for img in self.all_images]
         # Determine the set of characters
         if charset is None:
             characters = set(char for label in self.all_labels for char in label)
@@ -75,7 +78,10 @@ class OCRDataset:
             remaining_images = self.all_images[train_size:]
             remaining_labels = self.all_labels[train_size:]
         # Next split remaining into validation and test sets
-        test_split = 0.5  # proportion of remaining data to reserve for testing
+        if self.train_data_amount == 0:
+            test_split = 1
+        else:
+            test_split = 0.5  # proportion of remaining data to reserve for testing
         split_idx = int(len(remaining_images) * (1 - test_split))
         self.valid_images = remaining_images[:split_idx]
         self.valid_labels = remaining_labels[:split_idx]
@@ -104,16 +110,13 @@ class OCRDataset:
         def __getitem__(self, idx):
             img_path = self.images[idx]
             label = self.labels[idx]
-
-            image = plt.imread(img_path)  # (H, W) • (H, W, 3) • (H, W, 4)
+            image = plt.imread(img_path)
             # convert to grayscale if needed
             if image.ndim == 3:  # RGB or RGBA
                 if image.shape[2] == 4:  # strip alpha channel
                     image = image[..., :3]
-                # weighted average luminance
                 image = np.dot(image[..., :3], [0.2989, 0.5870, 0.1140])
-                # image is now (H, W)
-            # normalise & shape to [C, H, W]
+            # normalise to [C, H, W]
             if image.dtype == np.uint8:
                 image = image.astype(np.float32) / 255.0
             else:
@@ -123,10 +126,9 @@ class OCRDataset:
             image = pad_custom_color(image, self.img_width, self.img_height)
             if self.transform:
                 image = self.transform(image)
-
             label_length = len(label)
             return {
-                'image': image,  # [1, H, W]
+                'image': image,
                 'label': torch.tensor(label, dtype=torch.long),
                 'label_length': torch.tensor(label_length, dtype=torch.long)
             }
@@ -207,7 +209,7 @@ class OCRDataset:
                     match_percentage = similarity(text, decoded_label)
                     percentages.append(match_percentage)
                     seq_len = len(decoded_label)
-                    weighted_match_sum += match_percentage / 100 * seq_len
+                    weighted_match_sum += match_percentage * seq_len
                     weighted_total_chars += seq_len
 
         if weighted_total_chars > 0:
