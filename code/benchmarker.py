@@ -146,7 +146,7 @@ def main():
                     is_correct = (pred_text == orig_text)
                     color = 'green' if is_correct else 'red'
                     title = f"Pred: {pred_text}\nTrue: {orig_text}\nMatch: {match_percentage:.2f}%"
-                    ax[i // 4, i % 4].imshow(img, cmap="gray")
+                    ax[i // 4, i % 4].imshow(img, cmap="gray", vmin=0.0, vmax=1.0)
                     ax[i // 4, i % 4].set_title(title, fontsize=8, color=color)
                     ax[i // 4, i % 4].axis("off")
 

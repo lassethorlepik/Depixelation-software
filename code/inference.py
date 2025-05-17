@@ -139,7 +139,7 @@ def main():
                         img = np.transpose(img, (1, 2, 0))
 
                     fig, ax = plt.subplots(figsize=(2, 2), dpi=300)
-                    ax.imshow(img, cmap="gray")
+                    ax.imshow(img, cmap="gray", vmin=0.0, vmax=1.0)
                     ax.set_title(pred_text, fontsize=10, color="black", pad=5)
                     ax.axis("off")
 

@@ -1,5 +1,5 @@
 from random import Random
-
+from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
@@ -110,17 +110,9 @@ class OCRDataset:
         def __getitem__(self, idx):
             img_path = self.images[idx]
             label = self.labels[idx]
-            image = plt.imread(img_path)
-            # convert to grayscale if needed
-            if image.ndim == 3:  # RGB or RGBA
-                if image.shape[2] == 4:  # strip alpha channel
-                    image = image[..., :3]
-                image = np.dot(image[..., :3], [0.2989, 0.5870, 0.1140])
+            image = Image.open(img_path).convert('L')
             # normalise to [C, H, W]
-            if image.dtype == np.uint8:
-                image = image.astype(np.float32) / 255.0
-            else:
-                image = image.astype(np.float32)
+            image = np.asarray(image).astype(np.float32) / 255.0
             image = torch.from_numpy(image).unsqueeze(0)  # [1, H, W]
             image = crop_white(image)
             image = pad_custom_color(image, self.img_width, self.img_height)
@@ -242,7 +234,7 @@ class OCRDataset:
             img = images[idx].squeeze(0).numpy()
             decoded_label = decode_label(self.num_to_char, labels[idx])
             ax = axes[idx]
-            ax.imshow(img, cmap="gray", extent=(0, img.shape[1], img.shape[0], 0))
+            ax.imshow(img, cmap="gray", extent=(0, img.shape[1], img.shape[0], 0), vmin=0.0, vmax=1.0)
             ax.set_title(f"{decoded_label} ({label_lengths[idx].item()})", fontsize=8)
             ax.axis("off")
             rect = Rectangle(
@@ -292,7 +284,7 @@ class OCRDataset:
             color = 'green' if is_correct else 'red'
             title = f"Pred: {predicted_text}\nTrue: {orig_text}\nMatch: {match_percentage:.2f}%"
             ax = axes[i]
-            ax.imshow(img, cmap="gray", extent=[0, img.shape[1], img.shape[0], 0])
+            ax.imshow(img, cmap="gray", extent=[0, img.shape[1], img.shape[0], 0], vmin=0.0, vmax=1.0)
             ax.set_aspect('equal')
             ax.set_title(title, fontsize=10, color=color)
             ax.axis("off")
