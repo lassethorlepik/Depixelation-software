@@ -42,11 +42,11 @@ Can you crack the example image? Hint: Capital letters, 24pt Arial, block size 8
 ### Downloading weights
 Some already trained models can be downloaded here:
 
-[Numbers Arial 22-28pt 8px](http://pov.ee/link/weights/numbers.zip)
+[Numbers Arial 22-28pt 8px](https://pov.ee/link/weights/numbers.zip)
 
-[Capital letters Arial 22-28pt 8px](http://pov.ee/link/weights/capital_letters.zip)
+[Capital letters Arial 22-28pt 8px](https://pov.ee/link/weights/capital_letters.zip)
 
-[Alphanumeric Arial & Times New Roman 20-28pt 8px](http://pov.ee/link/weights/arial_times_general_20-28pt_8px.zip)
+[Alphanumeric Arial & Times New Roman 20-28pt 8px](https://pov.ee/link/weights/arial_times_general_20-28pt_8px.zip)
 
 Each model is in a zip file, which needs to be extracted in the `models` folder.
 Model metadata, benchmark results and training logs are included.
