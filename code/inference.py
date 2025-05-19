@@ -11,14 +11,13 @@ from rich.console import Console
 from rich.theme import Theme
 from datetime import datetime
 
+
 # Internal tools and modules
-from util import print, decode_label, check_gpu_compute
+from util import print, check_gpu_compute
 from dataset_instance import OCRDataset
 from model import OCRModel
+from gating_network import GatingNetwork
 
-# Longest string allowed to be output, used to avoid extremely long sequences and text overlapping
-# Excess characters will be simply discarded
-MAX_LENGTH = 25
 
 def display_inference_results(output_dir, cols=5):
     """Display saved inference images in a grid using matplotlib."""
@@ -54,6 +53,11 @@ def main():
     with open("config.json", "r", encoding="utf-8") as f:
         params = json.load(f)
 
+    with open(Path(f"../datasets/{params['dataset_names'][0]}/metadata.json"), "r", encoding="utf-8") as f:
+        metadata = json.load(f)
+    img_width = metadata["X"] // metadata["MIN_BLOCK"]
+    img_height = metadata["Y"] // metadata["MIN_BLOCK"]
+
     checkpoint_path = Path(f"../models/{params['model_name']}/model.pth")
     if checkpoint_path.exists():
         checkpoint_data = torch.load(checkpoint_path, map_location=device)
@@ -63,10 +67,6 @@ def main():
     else:
         print("NO MODEL FOUND!")
         return
-
-    # Get image dimensions from the first image.
-    with Image.open(image_paths[0]) as img:
-        img_width, img_height = img.size
 
     batch_size = 4
     train_data_amount = 0
@@ -83,11 +83,18 @@ def main():
         batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True
     )
 
-    model = OCRModel(
-        img_width=img_width,
-        img_height=img_height,
-        num_chars=len(dataset.num_to_char)
-    ).to(device)
+    if params['is_classifier']:
+        model = GatingNetwork(
+            img_width=img_width,
+            img_height=img_height,
+            num_to_char=dataset.num_to_char
+        ).to(device)
+    else:
+        model = OCRModel(
+            img_width=img_width,
+            img_height=img_height,
+            num_to_char=dataset.num_to_char
+        ).to(device)
     model.eval()
 
     model.load_state_dict(checkpoint_data['model_state_dict'])
@@ -120,12 +127,7 @@ def main():
             task = progress.add_task(f"Processing 0 / {total_images}", total=total_images)
             for batch_num, batch in enumerate(test_loader):
                 images = batch['image'].to(device)
-                labels = batch.get('label', None)
-                preds, loss = model(images)
-                pred_texts = model.decode_batch_predictions(preds, MAX_LENGTH, dataset.num_to_char)
-                orig_texts = []
-                for label in labels:
-                    orig_texts.append(decode_label(dataset.num_to_char, label))
+                orig_texts, pred_texts = model.inference_batch(images)
 
                 for i in range(len(pred_texts)):
                     pred_text = pred_texts[i]

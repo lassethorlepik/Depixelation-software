@@ -5,7 +5,9 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-from util import pad_custom_color, decode_label, remove_prefix, print, similarity, generate_random_string, crop_white
+
+from gating_network import label_to_class_idx
+from util import pad_custom_color, decode_label, remove_prefix, print, generate_random_string, crop_white
 
 
 class OCRDataset:
@@ -16,11 +18,6 @@ class OCRDataset:
         self.train_data_amount = train_data_amount
         self.dataset_limit = dataset_limit
         self.transform = transform
-
-        self.train_losses = []
-        self.val_losses = []
-        self.cumulative_train_times = []
-        self.validation_percentages = []
 
         self._load_dataset(charset)
         self._preprocess()
@@ -180,38 +177,6 @@ class OCRDataset:
             pin_memory=pin_memory,
         )
 
-    def validate(self, dataloader, device):
-        self.model.eval()
-        total_loss = 0.0
-        percentages = []
-        weighted_match_sum = 0.0
-        weighted_total_chars = 0
-        with torch.no_grad():
-            for batch in dataloader:
-                images = batch['image'].to(device)
-                labels = batch['label'].to(device)
-                label_len = batch["label_length"].to(device)
-                # Forward pass with loss computation.
-                log_probs, loss = self.model(images, labels, label_len)
-                total_loss += loss.mean().item()
-
-                decoded_texts = self.model.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
-                for i, text in enumerate(decoded_texts):
-                    decoded_label = decode_label(self.num_to_char, labels[i])
-                    match_percentage = similarity(text, decoded_label)
-                    percentages.append(match_percentage)
-                    seq_len = len(decoded_label)
-                    weighted_match_sum += match_percentage * seq_len
-                    weighted_total_chars += seq_len
-
-        if weighted_total_chars > 0:
-            avg_percentage = weighted_match_sum / weighted_total_chars
-        else:
-            avg_percentage = 0
-        self.validation_percentages.append(avg_percentage)
-        avg_val_loss = total_loss / len(dataloader)
-        return avg_val_loss, percentages
-
     def visualize_samples(self, num_samples=16):
         print("Displaying examples from the training set for user validation...")
         sample_dataset = OCRDataset._SplitDataset(
@@ -258,14 +223,10 @@ class OCRDataset:
                                                     pin_memory=False)
         batch = next(iter(val_loader))
         images = batch['image'].to(device)
-        labels = batch['label'].to(device)
         label_len = batch["label_length"].to(device)
+        labels = batch["label"]  # list of lists of ints
 
-        with torch.no_grad():
-            log_probs, _ = model(images, labels, label_len)
-
-        orig_texts = [decode_label(self.num_to_char, labels[i]) for i in range(len(labels))]
-        decoded_texts = model.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
+        orig_texts, pred_texts = model.inference_batch(images, labels, label_len)
 
         n_cols = 4
         n_rows = (num_samples + n_cols - 1) // n_cols
@@ -277,12 +238,11 @@ class OCRDataset:
 
         for i in range(num_samples):
             img = images[i].cpu().squeeze(0).numpy()
-            predicted_text = decoded_texts[i]
+            predicted_text = pred_texts[i]
             orig_text = orig_texts[i]
-            match_percentage = similarity(predicted_text, orig_text)
             is_correct = predicted_text == orig_text
             color = 'green' if is_correct else 'red'
-            title = f"Pred: {predicted_text}\nTrue: {orig_text}\nMatch: {match_percentage:.2f}%"
+            title = f"Pred: {predicted_text}\nTrue: {orig_text}\nMatch: {predicted_text == orig_text}"
             ax = axes[i]
             ax.imshow(img, cmap="gray", extent=[0, img.shape[1], img.shape[0], 0], vmin=0.0, vmax=1.0)
             ax.set_aspect('equal')
@@ -301,10 +261,10 @@ class OCRDataset:
         plt.close()
 
         # Plot loss history vs time
-        cumulative_minutes = [t / 60.0 for t in self.cumulative_train_times]
+        cumulative_minutes = [t / 60.0 for t in model.cumulative_train_times]
         plt.figure(figsize=(10, 5))
-        plt.plot(cumulative_minutes, self.train_losses, label='Training Loss')
-        plt.plot(cumulative_minutes, self.val_losses, label='Validation Loss')
+        plt.plot(cumulative_minutes, model.train_losses, label='Training Loss')
+        plt.plot(cumulative_minutes, model.val_losses, label='Validation Loss')
         plt.xlabel("Cumulative Training Time (minutes)")
         plt.ylabel("Loss")
         plt.xticks(np.arange(1, cumulative_minutes[-1] + 1, step=max(1, cumulative_minutes[-1] // 10)))
@@ -317,10 +277,10 @@ class OCRDataset:
 
         # Plot percentage history vs epoch
         plt.figure(figsize=(10, 5))
-        plt.plot(range(1, len(self.validation_percentages) + 1), self.validation_percentages, label='Average string similarity (%)')
+        plt.plot(range(1, len(model.validation_percentages) + 1), model.validation_percentages, label='Average string similarity (%)')
         plt.title('Epoch vs. Similarity')
         plt.xlabel('Epoch')
-        plt.xticks(np.arange(1, len(self.validation_percentages) + 1, step=max(1, len(self.validation_percentages) // 10)))
+        plt.xticks(np.arange(1, len(model.validation_percentages) + 1, step=max(1, len(model.validation_percentages) // 10)))
         plt.ylabel('Similarity')
         plt.ylim(0, 100)
         plt.legend()

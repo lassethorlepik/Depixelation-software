@@ -5,6 +5,8 @@ import time
 import torch
 from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+
+from gating_network import GatingNetwork
 from dataset_instance import OCRDataset
 from model import OCRModel
 from util import print, check_gpu_compute
@@ -36,11 +38,20 @@ def main():
     dataset.visualize_samples(num_samples=16)
     train_loader = dataset.get_train_dataloader(batch_size=params['batch_size'])
     validation_loader = dataset.get_validation_dataloader(batch_size=params['batch_size'], shuffle=False)
-    dataset.model = OCRModel(
-        img_width=img_width,
-        img_height=img_height,
-        num_chars=len(dataset.num_to_char),
-    ).to(device)
+
+    if params['is_classifier']:
+        dataset.model = GatingNetwork(
+            img_width=img_width,
+            img_height=img_height,
+            num_to_char=dataset.num_to_char
+        ).to(device)
+    else:
+        dataset.model = OCRModel(
+            img_width=img_width,
+            img_height=img_height,
+            num_to_char=dataset.num_to_char
+        ).to(device)
+
     optimizer = torch.optim.Adam(dataset.model.parameters(), lr=params['learning_rate'], weight_decay=params['decay'])
     reduce_lr = ReduceLROnPlateau(
         optimizer,
@@ -58,16 +69,18 @@ def main():
         json.dump(params, f, indent=4)
     checkpoint_path = os.path.join(model_folder, "model.pth")
 
+    model = dataset.model
+
     if os.path.exists(checkpoint_path):
         print("Weights found, loading...")
         checkpoint_data = torch.load(checkpoint_path, map_location=device)
-        dataset.model.load_state_dict(checkpoint_data['model_state_dict'])
+        model.load_state_dict(checkpoint_data['model_state_dict'])
         optimizer.load_state_dict(checkpoint_data['optimizer_state_dict'])
         initial_epoch = checkpoint_data['epoch'] + 1
-        dataset.train_losses = checkpoint_data.get('train_losses', [])
-        dataset.val_losses = checkpoint_data.get('val_losses', [])
-        dataset.cumulative_train_times = checkpoint_data.get('cumulative_train_times', [])
-        dataset.validation_percentages = checkpoint_data.get('validation_percentages', [])
+        model.train_losses = checkpoint_data.get('train_losses', [])
+        model.val_losses = checkpoint_data.get('val_losses', [])
+        model.cumulative_train_times = checkpoint_data.get('cumulative_train_times', [])
+        model.validation_percentages = checkpoint_data.get('validation_percentages', [])
         best_val_loss = checkpoint_data.get('best_val_loss', float('inf'))
         best_model_state = checkpoint_data['model_state_dict']
         best_optimizer_state = checkpoint_data['optimizer_state_dict']
@@ -80,32 +93,32 @@ def main():
                 pass
 
     print("Model Summary:")
-    print(dataset.model)
+    print(model)
     os.makedirs(os.path.join(model_folder, "results"), exist_ok=True)
     start_time = time.perf_counter()
 
     for epoch in range(initial_epoch, params['max_epochs']):
         print(f"Epoch {epoch + 1}/{params['max_epochs']} starting...")
 
-        avg_train_loss = dataset.model.train_epoch(train_loader, optimizer, device)
-        avg_val_loss, percentages = dataset.validate(validation_loader, device)
+        avg_train_loss = model.train_epoch(train_loader, optimizer, device)
+        avg_val_loss, percentages = model.validate(validation_loader, device)
 
         epoch_duration = time.perf_counter() - start_time
-        cumulative_time = dataset.cumulative_train_times[-1] + epoch_duration if dataset.cumulative_train_times else epoch_duration
-        dataset.cumulative_train_times.append(cumulative_time)
+        cumulative_time = model.cumulative_train_times[-1] + epoch_duration if model.cumulative_train_times else epoch_duration
+        model.cumulative_train_times.append(cumulative_time)
         start_time = time.perf_counter()
 
         reduce_lr.step(avg_val_loss)
         current_lr = optimizer.param_groups[0]['lr']
 
         # Record the losses for later analysis
-        dataset.train_losses.append(avg_train_loss)
-        dataset.val_losses.append(avg_val_loss)
+        model.train_losses.append(avg_train_loss)
+        model.val_losses.append(avg_val_loss)
 
         print(f"Epoch {epoch + 1} Training Loss: {avg_train_loss:.4f} Validation Loss: {avg_val_loss:.4f}")
         print(f"LR: {current_lr:.4f} Epoch Duration: {epoch_duration:.2f} sec, Cumulative Time: {cumulative_time / 60.0:.2f} min")
 
-        dataset.visualize_predictions(dataset.model, device, epoch, params['model_name'], num_samples=16)
+        dataset.visualize_predictions(model, device, epoch, params['model_name'], num_samples=16)
 
         if params['log_detailed_accuracy']:
             with open(os.path.join(model_folder, "detailed_accuracy.csv"), 'a', newline='') as file:
@@ -114,7 +127,7 @@ def main():
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            best_model_state = dataset.model.state_dict()
+            best_model_state = model.state_dict()
             best_optimizer_state = optimizer.state_dict()
             print(f"New best weights found at epoch {epoch + 1} with validation loss: {best_val_loss:.4f}")
 
@@ -122,10 +135,10 @@ def main():
             'epoch': epoch,
             'model_state_dict': best_model_state,
             'optimizer_state_dict': best_optimizer_state,
-            'train_losses': dataset.train_losses,
-            'val_losses': dataset.val_losses,
-            'cumulative_train_times': dataset.cumulative_train_times,
-            'validation_percentages': dataset.validation_percentages,
+            'train_losses': model.train_losses,
+            'val_losses': model.val_losses,
+            'cumulative_train_times': model.cumulative_train_times,
+            'validation_percentages': model.validation_percentages,
             'char_to_num': dataset.char_to_num,
             'train_data_amount': params['train_data_amount'],
             'best_val_loss': best_val_loss,

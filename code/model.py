@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
+from util import decode_label, similarity
+
 
 def ctc_decode(y_pred: torch.Tensor, blank: int = 0):
     """Greedy CTC decode (collapse repeats + remove blanks)"""
@@ -17,11 +19,18 @@ def ctc_decode(y_pred: torch.Tensor, blank: int = 0):
 
 
 class OCRModel(nn.Module):
-    def __init__(self, img_width: int, img_height: int, num_chars: int):
+    def __init__(self, img_width: int, img_height: int, num_to_char):
         super().__init__()
         self.img_width = img_width
         self.img_height = img_height
-        self.num_chars = num_chars
+        self.num_to_char = num_to_char
+        self.num_chars = len(num_to_char)
+
+        self.is_classifier = False
+        self.train_losses = []
+        self.val_losses = []
+        self.cumulative_train_times = []
+        self.validation_percentages = []
 
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
@@ -36,7 +45,7 @@ class OCRModel(nn.Module):
         self.lstm1 = nn.LSTM(2 * 512, 256, num_layers=2, bidirectional=True, batch_first=True, dropout=0.2)
         self.lstm2 = nn.LSTM(2 * 256, 128, num_layers=2, bidirectional=True, batch_first=True, dropout=0.2)
 
-        self.fc = nn.Linear(2 * 128, num_chars)  # final classifier, includes blank
+        self.fc = nn.Linear(2 * 128, self.num_chars)  # final classifier, includes blank
 
         self._initialize_weights()
 
@@ -132,3 +141,42 @@ class OCRModel(nn.Module):
             chars = [num_to_char.get(int(idx), "") for idx in seq]
             texts.append("".join(chars))
         return texts
+
+    def validate(self, dataloader, device):
+        self.eval()
+        total_loss = 0.0
+        percentages = []
+        weighted_match_sum = 0.0
+        weighted_total_chars = 0
+        with torch.no_grad():
+            for batch in dataloader:
+                images = batch['image'].to(device)
+                labels = batch['label'].to(device)
+                label_len = batch["label_length"].to(device)
+                # Forward pass with loss computation.
+                log_probs, loss = self(images, labels, label_len)
+                total_loss += loss.mean().item()
+
+                decoded_texts = self.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
+                for i, text in enumerate(decoded_texts):
+                    decoded_label = decode_label(self.num_to_char, labels[i])
+                    match_percentage = similarity(text, decoded_label)
+                    percentages.append(match_percentage)
+                    seq_len = len(decoded_label)
+                    weighted_match_sum += match_percentage * seq_len
+                    weighted_total_chars += seq_len
+
+        if weighted_total_chars > 0:
+            avg_percentage = weighted_match_sum / weighted_total_chars
+        else:
+            avg_percentage = 0
+        self.validation_percentages.append(avg_percentage)
+        avg_val_loss = total_loss / len(dataloader)
+        return avg_val_loss, percentages
+
+    def inference_batch(self, images, labels=None, label_len=None):
+        with torch.no_grad():
+            log_probs, _ = self(images, labels, label_len)
+        orig_texts = [decode_label(self.num_to_char, labels[i]) for i in range(len(labels or []))]
+        decoded_texts = self.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
+        return orig_texts, decoded_texts

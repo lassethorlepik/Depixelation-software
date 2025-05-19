@@ -1,14 +1,18 @@
 {
-    "model_name": "model_numbers_8px",
-    "dataset_names": ["numbers_8px"],
-    "batch_size": 128,
+    "model_name": "uppercase_vs_numbers_classifier_24-28pt_16px",
+    "dataset_names": [
+        "arial_uppercase_24-28pt_16px",
+        "arial_numbers_24-28pt_16px"
+    ],
+    "batch_size": 32,
     "train_data_amount": 0.99,
     "dataset_limit": null,
     "decay": 0.000001,
     "learning_rate": 0.001,
-    "min_learning_rate": 1e-6,
+    "min_learning_rate": 1e-7,
     "lr_reduce_factor": 0.5,
     "patience": 5,
     "max_epochs": 100,
+    "is_classifier": true,
     "log_detailed_accuracy": true
 }

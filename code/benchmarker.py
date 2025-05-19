@@ -16,6 +16,7 @@ import seaborn as sns
 from util import check_gpu_compute, print, similarity, decode_label
 from dataset_instance import OCRDataset
 from model import OCRModel
+from gating_network import GatingNetwork
 
 
 def main():
@@ -47,12 +48,19 @@ def main():
         batch_size=batch_size, shuffle=False
     )
 
-    # Instantiate the OCR model and set it to evaluation mode.
-    model = OCRModel(
-        img_width=img_width,
-        img_height=img_height,
-        num_chars=len(dataset.num_to_char),
-    ).to(device)
+    # Instantiate the model and set it to evaluation mode.
+    if params['is_classifier']:
+        model = GatingNetwork(
+            img_width=img_width,
+            img_height=img_height,
+            num_to_char=dataset.num_to_char
+        ).to(device)
+    else:
+        model = OCRModel(
+            img_width=img_width,
+            img_height=img_height,
+            num_to_char=dataset.num_to_char,
+        ).to(device)
     model.eval()
 
     # Load the trained weights if they exist.
@@ -104,11 +112,8 @@ def main():
                 images = batch['image'].to(device)
                 labels = batch['label'].to(device)
                 label_len = batch["label_length"].to(device)
-                preds, loss = model(images, labels, label_len)
-                pred_texts = model.decode_batch_predictions(preds, dataset.max_length, dataset.num_to_char)
-                orig_texts = []
-                for label in labels:
-                    orig_texts.append(decode_label(dataset.num_to_char, label))
+
+                orig_texts, pred_texts = model.inference_batch(images, labels, label_len)
 
                 n_preds = len(pred_texts)
                 n_rows = (n_preds + 3) // 4
