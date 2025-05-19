@@ -157,7 +157,7 @@ class OCRModel(nn.Module):
                 log_probs, loss = self(images, labels, label_len)
                 total_loss += loss.mean().item()
 
-                decoded_texts = self.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
+                decoded_texts = self.decode_batch_predictions(log_probs, 20, self.num_to_char)
                 for i, text in enumerate(decoded_texts):
                     decoded_label = decode_label(self.num_to_char, labels[i])
                     match_percentage = similarity(text, decoded_label)
@@ -177,6 +177,6 @@ class OCRModel(nn.Module):
     def inference_batch(self, images, labels=None, label_len=None):
         with torch.no_grad():
             log_probs, _ = self(images, labels, label_len)
-        orig_texts = [decode_label(self.num_to_char, labels[i]) for i in range(len(labels or []))]
-        decoded_texts = self.decode_batch_predictions(log_probs, self.max_length, self.num_to_char)
+        orig_texts = [decode_label(self.num_to_char, labels[i]) for i in range(len(labels if labels is not None else []))]
+        decoded_texts = self.decode_batch_predictions(log_probs, 20, self.num_to_char)
         return orig_texts, decoded_texts

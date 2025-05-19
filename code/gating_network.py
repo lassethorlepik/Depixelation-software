@@ -3,10 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
+
 def label_to_class_idx(label: str) -> int:
     if label.isdigit():
         return 1
-    return 0
+    elif label.isalpha():
+        return 0
 
 
 class GatingNetwork(nn.Module):
@@ -67,7 +69,8 @@ class GatingNetwork(nn.Module):
         loss = F.nll_loss(log_probs, y_true, reduction="none")
         return log_probs, loss
 
-    def decode_batch_predictions(self, log_probs: torch.Tensor, max_length: int, num_to_char: dict[int, str]) -> list[str]:
+    def decode_batch_predictions(self, log_probs: torch.Tensor, max_length: int, num_to_char: dict[int, str]) -> list[
+        str]:
         """Decode model outputs"""
         texts: list[str] = []
         preds = log_probs.argmax(dim=1)
@@ -92,11 +95,7 @@ class GatingNetwork(nn.Module):
             images = batch["image"].to(device)
             # Convert each string to its class index
             raw_labels = batch["label"].cpu().tolist()
-            class_idx_list = []
-            for label in raw_labels:
-                chars = [self.num_to_char.get(int(value), "") for value in label]
-                label_string = "".join(chars)
-                class_idx_list.append(label_to_class_idx(label_string))
+            class_idx_list = self.batch_get_class_index(raw_labels)
             labels = torch.tensor(class_idx_list, dtype=torch.long, device=device)
 
             optimizer.zero_grad()
@@ -121,12 +120,7 @@ class GatingNetwork(nn.Module):
                 images = batch['image'].to(device)
                 # convert each sequence‐of‐ints label to single class index
                 raw_labels = batch["label"].cpu().tolist()
-                class_idx_list = []
-                for seq in raw_labels:
-                    chars = [self.num_to_char.get(int(v), "") for v in seq]
-                    label_str = "".join(chars)
-                    class_idx = label_to_class_idx(label_str)
-                    class_idx_list.append(class_idx)
+                class_idx_list = self.batch_get_class_index(raw_labels)
                 labels = torch.tensor(class_idx_list, dtype=torch.long, device=device)  # [B]
 
                 log_probs, loss = self(images, labels, None)
@@ -142,14 +136,18 @@ class GatingNetwork(nn.Module):
         self.validation_percentages.append(accuracy)
         return avg_val_loss, [100 if m else 0 for m in all_matches]
 
-    def inference_batch(self, images, labels=None, label_len=None):
-        labels_list = labels.tolist() if labels is not None else []
+    def batch_get_class_index(self, labels_list):
         class_idx_list = []
         for seq in labels_list:
-            chars = [self.num_to_char.get(int(v), "") for v in seq]
+            chars = [self.num_to_char.get(int(v), "") for v in seq if v != 0]
             text = "".join(chars)
             class_idx = label_to_class_idx(text)
             class_idx_list.append(class_idx)
+        return class_idx_list
+
+    def inference_batch(self, images, labels=None, label_len=None):
+        labels_list = labels.tolist() if labels is not None else []
+        class_idx_list = self.batch_get_class_index(labels_list)
         if labels is not None:
             labels = torch.tensor(class_idx_list, dtype=torch.long, device=images.device)  # [B]
         with torch.no_grad():

@@ -92,7 +92,7 @@ def main():
             with open(os.path.join(model_folder, "detailed_accuracy.csv"), 'w', newline='') as file:
                 pass
 
-    print("Model Summary:")
+    print("Model summary:")
     print(model)
     os.makedirs(os.path.join(model_folder, "results"), exist_ok=True)
     start_time = time.perf_counter()
